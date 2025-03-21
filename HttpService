@@ -1,0 +1,239 @@
+/*
+* Android本地启动service
+*/
+
+1.在gradle  中添加      
+    //nanohttpd
+    implementation'org.nanohttpd:nanohttpd:2.2.0'
+2.调用 //启动HTTPD服务
+       HttpService httpService = new HttpService("127.0.0.1",8080);
+        try {
+            httpService.start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+3.相关方法类
+import android.os.Environment;
+import android.util.Log;
+
+import com.sz.qy_measure.utils.AppManager;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import fi.iki.elonen.NanoHTTPD;
+
+public class HttpService extends NanoHTTPD {
+    public static final String TAG = HttpService.class.getSimpleName();
+
+    /*
+    private String filePath;
+
+    private String goodModelPath;
+
+    private String downFile;*/
+
+   // private String origin;
+
+    public HttpService(int port) {
+        super(port);
+    }
+
+    public HttpService(String hostname, int port) {
+        super(hostname, port);
+    }
+
+    //重写Serve方法，每次请求时会调用该方法
+    @Override
+    public Response serve(IHTTPSession session) {
+        String uri = session.getUri();
+        Log.d(TAG,"===URI==="+uri);
+        Map<String, String> headers = session.getHeaders();
+        Log.d(TAG,"===headers==="+ headers.toString());
+        String origin =  headers.get("origin");
+        if(session.getMethod() == Method.GET){
+            String fileName = uri.split("/")[0];
+            Log.d(TAG,"===fileName==="+fileName);
+            return getResponseFile(uri,origin);
+            /*
+            if(uri.contains("obj")){
+                return getResponseFile("obj");
+            }
+            else if(uri.contains("mtl")){
+                return getResponseFile("mtl");
+            }
+            else if(uri.contains("jpg")){
+                return getResponseFile("jpg");
+            }*/
+
+        }
+        //通过session获取请求的方式和类型
+         /*
+        Method method = session.getMethod();
+        // 判断post请求并且是上传文件
+        //将上传数据解析到files集合并且存在NanoHTTPD缓存区
+
+        Map<String, String> files = new HashMap<>();
+        if (Method.POST.equals(method) || Method.PUT.equals(method)) {
+            try {
+                session.parseBody(files);
+            } catch (IOException ioe) {
+                return getResponse("Internal Error IO Exception: " + ioe.getMessage());
+            } catch (ResponseException re) {
+                return newFixedLengthResponse(re.getStatus(), MIME_PLAINTEXT, re.getMessage());
+            }
+        }
+        //after the body parsed, by default nanoHTTPD will save the file
+        // to cache and put it into params
+
+        //2.将解析出来的文件根据需要保存在本地（或者上传服务器）
+        Map<String, String> params = session.getParms();
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            final String paramsKey = entry.getKey();
+            //"file"是上传文件参数的key值
+            if (paramsKey.contains("file")) {
+                final String tmpFilePath = files.get(paramsKey);
+                //可以直接拿上传的文件名保存，也可以解析一下然后自己命名保存
+                final String fileName = entry.getValue();
+                final File tmpFile = new File(tmpFilePath);
+                //targetFile是你要保存的file，这里是保存在SD卡的根目录（需要获取文件读写权限）
+                final File targetFile = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), fileName);
+                Log.d("copy file now, source file path<>target file path", tmpFile.getAbsoluteFile()+"<>"+targetFile.getAbsoluteFile());
+                //a copy file methoed just what you like
+                copyFile(tmpFile, targetFile);
+
+                //maybe you should put the follow code out
+                return getResponse("Success");
+            }
+        }*/
+        return response404(uri);
+    }
+
+    //成功请求
+    public Response getResponse(String success) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("<!DOCTYPE html><html>body>");
+        builder.append(success+ " !");
+        builder.append("</body></html>\n");
+        return NanoHTTPD.newFixedLengthResponse(builder.toString());
+    }
+
+    //页面不存在，或者文件不存在时
+    public Response response404(String url) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Not Found" + url + " !");
+        return NanoHTTPD.newFixedLengthResponse(builder.toString());
+    }
+
+    //返回文件
+    public Response getResponseFile(String url,String origin) {
+        String modelName = AppManager.getInstance().getModelName();
+        //String modelName = "model20240527092015";
+        /*
+        if(fileType.equals("obj")){
+            filePath = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/QyUE4/Scan/" +  modelName +"/head3d.obj";
+        }
+        else if(fileType.equals("mtl")){
+            filePath = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/QyUE4/Scan/" + modelName +"/head3d.mtl";
+        }
+        else if(fileType.equals("jpg")){
+            filePath = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/QyUE4/Scan/" + modelName +"/head3d.jpg";
+        }*/
+        String downFile = "";
+        String filePath = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/QyUE4/Scan/" +  modelName + url;
+        File file_res = new File(filePath);
+        String goodModelPath = Environment.getExternalStorageDirectory().getAbsolutePath()+ "/qyGoodModelDown" + url;
+        File file_goodModel = new File(goodModelPath);
+        //Log.d(TAG,"===文件名称getResponseFile==="+filePath+"==goodModelPath=="+goodModelPath);
+        if(!file_res.exists() && !file_goodModel.exists()){
+            Log.d(TAG,"===文件不存在getResponseFile==="+filePath+"==goodModelPath=="+goodModelPath);
+            //response404(filePath);
+            //return NanoHTTPD.newFixedLengthResponse(Response.Status.OK,"text/plain","404");
+            Response resp = NanoHTTPD.newFixedLengthResponse(Response.Status.NOT_FOUND,"application/octet-stream","NotFound");
+            resp.addHeader("Access-Control-Allow-Origin", origin);
+            resp.addHeader("Access-Control-Allow-Methods", "GET");
+            resp.addHeader("Access-Control-Allow-Headers", "Content-Type");
+            return resp;
+            //return null;
+        }
+        if(file_res.exists()){
+            downFile = filePath;
+        }
+        if(file_goodModel.exists()){
+            downFile = goodModelPath;
+        }
+        try {
+            //Log.d(TAG,"===getResponseFile==="+filePath);
+            //InputStream fileInputStream = new FileInputStream(filePath);
+            Log.d(TAG,"===getResponseFile==="+downFile);
+            InputStream fileInputStream = new FileInputStream(downFile);
+            //mimeType 是下载文件的类型，可以百度找一下你返回文件的类型写法
+            //        '.a' : 'application/octet-stream',
+            //        '.avi' : 'video/x-msvideo',
+            //        '.bat' : 'text/plain',
+            //        '.wav' : 'audio/x-wav',
+            //        '.bin' : 'application/octet-stream',
+            //        '.bmp' : 'image/x-ms-bmp',
+            //        '.c' : 'text/plain',
+            //Map<String, String> headers = new HashMap<>();
+            Response resp = NanoHTTPD.newFixedLengthResponse(Response.Status.OK,"application/octet-stream",fileInputStream,fileInputStream.available());
+            //return NanoHTTPD.newFixedLengthResponse(Response.Status.OK,"application/octet-stream",fileInputStream,fileInputStream.available());
+            resp.addHeader("Access-Control-Allow-Origin", origin);
+            resp.addHeader("Access-Control-Allow-Methods", "GET");
+            resp.addHeader("Access-Control-Allow-Headers", "Content-Type");
+            return resp;
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            return response404("FileNotFound");
+        } catch (IOException e) {
+            e.printStackTrace();
+            return response404("FileError");
+        }
+    }
+
+
+
+    public void copyFile(File file, File targetfile) {
+        FileInputStream fis = null;
+        FileOutputStream fos = null;
+        if (!file.exists()) {
+            System.err.println("File not exists!");
+            return;
+        }
+        try {
+            fis = new FileInputStream(file);
+            fos = new FileOutputStream(targetfile);
+            byte[] buffer = new byte[1024];
+            int len = 0;
+            while ((len = fis.read(buffer)) != -1) {
+                fos.write(buffer, 0, len);
+                fos.flush();
+            }
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(HttpService.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(HttpService.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            try {
+                if (fis != null) {
+
+                    fis.close();
+                }
+                if (fos != null) {
+                    fos.close();
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(HttpService.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+}
