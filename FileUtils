@@ -570,4 +570,71 @@ public final class FileUtils {
         public static final int GB   = 1073741824;
 
     }
+
+//当某个文件夹下文件超过100后删除文件
+    public  static void cleanDirScan(String path) {
+        File file = new File(path);
+        File[] files = file.listFiles();
+        ArrayList<String> fileArray = new ArrayList<>();
+        if (files != null && files.length > 0) {
+            for(File temp : files){
+                if (temp.isFile()) {//如果是zip文件就直接删除
+                    Log.d("cleanDir-fileName", temp.getName()); //打印文件名
+                    temp.delete();
+                }
+                if (temp.isDirectory()) {//最早的放前面
+                    //cleanDir(temp.getAbsolutePath());
+                    //temp.delete();
+                    Log.d("cleanDir-DirectoryName", temp.getName()); //打印文件名
+                    fileArray.add(temp.getName());
+                }
+            }
+        }
+        if(fileArray.size() > 100){//如果模型文件超过100
+             int sum = fileArray.size() - 100;
+             for(int i = 0; i<sum; i++){
+                 //cleanDir(path+fileArray.get(i));
+                 deleteSDFile(new File(path+fileArray.get(i)));//删除整个文件夹
+             }
+        }
+    }
+
+    //删除整个文件夹方法
+    public static boolean deleteSDFile(File file) {
+
+        //file目标文件夹绝对路径
+        if (file.exists()) { //指定文件是否存在
+            if (file.isFile()) { //该路径名表示的文件是否是一个标准文件
+                file.delete(); //删除该文件
+            } else if (file.isDirectory()) { //该路径名表示的文件是否是一个目录（文件夹）
+                File[] files = file.listFiles(); //列出当前文件夹下的所有文件
+                for (File f : files) {
+                    deleteSDFile(f); //递归删除
+                    Log.d("deleteSDFile-fileName", f.getName()); //打印文件名
+                }
+            }
+            file.delete(); //删除文件夹（song,art,lyric）保留文件夹
+        }
+        return true;
+    }
+
+    //清空文件夹
+    public  static void cleanDir(String path) {
+        File file = new File(path);
+        File[] files = file.listFiles();
+        if (files != null && files.length > 0) {
+            for(File temp : files){
+                if (temp.isFile()) {
+                    temp.delete();
+                    Log.d("cleanDir-fileName", temp.getName()); //打印文件名
+                }
+                if (temp.isDirectory()) {
+                    cleanDir(temp.getAbsolutePath());
+                    temp.delete();
+                    Log.d("cleanDir-DirectoryName", temp.getName()); //打印文件名
+                }
+            }
+        }
+    }
+
 }
